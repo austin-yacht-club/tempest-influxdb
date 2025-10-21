@@ -31,109 +31,46 @@ This document outlines best practices for developing and maintaining the Tempest
 - Include future enhancement ideas
 - Update project status regularly
 
-### 2. Git Workflow - Pull Request Based Development
+### 2. Git Workflow - Direct Commit to Main
 
-#### Branch Strategy
-- **Always create feature branches** for new work instead of committing directly to `main`
-- Use descriptive branch names:
-  - `feature/description` (e.g., `feature/tcp-protocol-support`)
-  - `fix/description` (e.g., `fix/timestamp-metadata-error`)
-  - `docs/description` (e.g., `docs/update-readme-examples`)
-  - `refactor/description` (e.g., `refactor/optimize-parsing-logic`)
-
-#### Pull Request Workflow
-1. **Update main branch and create feature branch**:
-   ```bash
-   # Ensure you're on main and it's up to date
-   git checkout main
-   git pull origin main
-   
-   # Create feature branch from latest main
-   git checkout -b feature/your-feature-name
-   
-   # Set upstream tracking for the branch
-   git push -u origin feature/your-feature-name
-   ```
-
-2. **Make changes** following all documentation requirements below
-
-3. **Test and validate** using syntax checks and manual testing
-
-4. **Commit with conventional messages**:
-   ```bash
-   git add .
-   git commit -m "feat: add your feature description
-   
-   Detailed explanation of changes:
-   - What was modified and why
-   - Technical details and implementation notes
-   
-   Files changed:
-   - main.py: specific functions/lines modified
-   - README.md: documentation updates
-   - CHANGES.md: changelog entry
-   
-   Testing:
-   - Manual testing performed
-   - Syntax checks passing"
-   ```
-
-5. **Push branch and create Pull Request**:
-   ```bash
-   git push
-   ```
-   Then create PR on GitHub with descriptive title and body
-
-6. **Pull Request Requirements**:
-   - Clear, descriptive title
-   - Detailed description of changes and rationale
-   - Checklist of completed requirements
-   - Reference any related issues
+#### Commit Requirements
+- **Always commit changes** after every significant modification
+- Include comprehensive commit messages with:
+  - What was changed
+  - Why it was changed
+  - Technical details when relevant
+- Use conventional commit-style messages when possible:
+  - `feat: add new feature`
+  - `fix: resolve bug`
+  - `docs: update documentation`
+  - `refactor: improve code structure`
 
 #### Commit Message Format
-Use conventional commit-style messages for all commits:
 ```bash
-# Feature additions
-feat: brief description of new feature
+git commit -m "Type: brief description
 
-# Bug fixes  
-fix: brief description of bug fix
+Detailed explanation of changes:
+- What was modified
+- Why it was necessary
+- Technical details
 
-# Documentation updates
-docs: brief description of documentation changes
+Files changed:
+- File names and line numbers
 
-# Code refactoring
-refactor: brief description of refactoring
-
-# Dependencies or build changes
-chore: brief description of maintenance tasks
+Benefits/Impact:
+- What this improves
+- Any breaking changes"
 ```
 
-#### Example Good Branch and PR Workflow
+#### Example Good Commit
 ```bash
-# Update main branch and create feature branch
-git checkout main
-git pull origin main
-git checkout -b feature/environment-variable-support
-git push -u origin feature/environment-variable-support
-
-# Make changes following documentation requirements
-# ... code changes ...
-# ... update README.md ...
-# ... update CHANGES.md ...
-# ... update TODO.md ...
-
-# Run syntax checks
-./check-syntax.sh
-
-# Commit with conventional message
-git add .
 git commit -m "feat: add environment variable support for all config options
 
 Added TEMPEST_* environment variables for every command-line argument:
-- TEMPEST_UDP_PORT, TEMPEST_PUBLISH_INTERVAL, TEMPEST_DEBUG, TEMPEST_NO_FIREWALL
-- Configuration priority: CLI args > ENV vars > Defaults
-- Added startup indicators showing active env vars
+- TEMPEST_UDP_PORT (default: 50222)
+- TEMPEST_PUBLISH_INTERVAL (default: 60)
+- TEMPEST_DEBUG (boolean)
+- TEMPEST_NO_FIREWALL (boolean)
 
 Files changed:
 - main.py: parse_args() function enhanced with env var support
@@ -149,45 +86,6 @@ Testing:
 Benefits:
 - Better Docker/Kubernetes integration
 - Easier CI/CD configuration"
-
-# Push and create PR
-git push
-```
-
-#### Pull Request Template
-When creating PRs, include this information:
-
-**Title**: `[Type] Brief description`
-
-**Description**:
-```markdown
-## Overview
-Brief description of what this PR does and why.
-
-## Changes Made
-- [ ] Code changes in main.py (list specific functions/features)
-- [ ] Documentation updates (README.md, CHANGES.md, TODO.md)
-- [ ] Testing completed
-
-## Technical Details
-- What was implemented
-- Key technical decisions and rationale
-- Any breaking changes or migration notes
-
-## Testing
-- [ ] Syntax checks passing (`./check-syntax.sh`)
-- [ ] Manual testing performed
-- [ ] Environment variable testing (if applicable)
-
-## Documentation
-- [ ] README.md updated with new features/examples
-- [ ] CHANGES.md includes detailed changelog entry
-- [ ] TODO.md reflects current status
-
-## Checklist
-- [ ] Follows development workflow from DEVELOPMENT.md
-- [ ] All documentation requirements met
-- [ ] Ready for review and merge
 ```
 
 ### 3. Code Quality Standards
@@ -223,32 +121,28 @@ Brief description of what this PR does and why.
 - `Dockerfile` - Container configuration
 
 #### Update Priority
-When making changes in a feature branch, update files in this order:
+When making changes, update files in this order:
 1. **Code changes** (main.py)
 2. **README.md** (user-facing documentation)
 3. **CHANGES.md** (changelog)
 4. **TODO.md** (task tracking)
-5. **Git commit** (in feature branch)
-6. **Pull Request** (for review and merge)
+5. **Git commit** (version control)
 
 ### 5. Development Checklist
 
-Before creating a Pull Request, verify:
+Before committing any changes, verify:
 
-- [ ] **Feature branch created** (not working directly on main)
 - [ ] Code changes are working and tested
 - [ ] **Syntax checks pass** (see Syntax Checking section below)
 - [ ] README.md is updated with new features/examples
 - [ ] CHANGES.md includes detailed changelog entry
 - [ ] TODO.md reflects current status
-- [ ] Commit message follows conventional format
-- [ ] All changes committed to feature branch
-- [ ] Branch pushed to remote repository
-- [ ] Pull Request created with comprehensive description
+- [ ] Commit message is comprehensive
+- [ ] Working directory is clean before commit
 
 #### Syntax Checking
 
-**Required checks before every feature branch commit and Pull Request**:
+**Required checks before every commit**:
 
 1. **Python Syntax Check**:
    ```bash
@@ -414,29 +308,18 @@ This shows detailed logging for development and troubleshooting.
 
 ## Quick Reference
 
-### Pull Request Workflow:
-1. Update main branch and create feature branch ✅
-2. Set upstream tracking for the branch ✅
-3. Make changes following documentation requirements ✅
-4. Run syntax checks ✅
-5. Update README.md ✅
-6. Update CHANGES.md ✅  
-7. Update TODO.md ✅
-8. Commit to feature branch with conventional message ✅
-9. Push branch to remote ✅
-10. Create Pull Request with comprehensive description ✅
+### Before Every Commit:
+1. Run syntax checks ✅
+2. Update README.md ✅
+3. Update CHANGES.md ✅  
+4. Update TODO.md ✅
+5. Test changes ✅
+6. Git commit with detailed message ✅
 
 ### File Update Order:
-1. Code changes (main.py)
-2. Documentation updates (README.md, CHANGES.md, TODO.md)
-3. Git commit in feature branch
-4. Push branch and create Pull Request
-
-### Branch Naming:
-- `feature/description` - New features
-- `fix/description` - Bug fixes
-- `docs/description` - Documentation updates
-- `refactor/description` - Code refactoring
+1. Code (main.py)
+2. Documentation (README.md, CHANGES.md, TODO.md)
+3. Git commit
 
 ### Documentation Standards:
 - README.md: User-facing documentation
@@ -444,10 +327,4 @@ This shows detailed logging for development and troubleshooting.
 - TODO.md: Task and status tracking
 - DEVELOPMENT.md: This development guide
 
-### Key Principles:
-- **Never commit directly to main** - always use feature branches and Pull Requests
-- **All changes require documentation updates** - README.md, CHANGES.md, TODO.md
-- **Comprehensive testing** - syntax checks and manual validation required
-- **Clear commit messages** - conventional format with detailed descriptions
-
-Following these practices ensures the project remains maintainable, well-documented, and collaborative through proper code review processes.
+Following these practices ensures the project remains maintainable, well-documented, and professional.

@@ -4,6 +4,11 @@
 
 The Tempest Weather Station Waggle Plugin is now fully functional and ready for deployment.
 
+## Recent Changes
+
+- ✅ **2025-10-12**: Reverted to direct commit workflow for simplified development
+- ✅ **2025-10-12**: Differentiated scope for obs_st (all) vs rapid_wind (node) data
+
 ## Completed Tasks
 
 - ✅ Implement Tempest UDP listener for receiving weather station broadcasts
