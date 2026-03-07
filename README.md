@@ -1,103 +1,109 @@
-# Tempest Weather Station Waggle Plugin
+# Tempest Weather Station InfluxDB Publisher
 
-A standalone Waggle plugin that receives UDP broadcasts from a local Tempest weather station and publishes the data to the Waggle message stream.
+A standalone service that receives TCP/UDP data from a local Tempest weather station and writes it directly to InfluxDB.
 
 ## Overview
 
-This plugin extracts the Tempest functionality from the main waggle-davis project and provides it as an independent service. It listens for UDP broadcasts from Tempest weather stations and publishes comprehensive weather data including wind, temperature, humidity, pressure, precipitation, and lightning information.
+This publisher listens for TCP length-prefixed messages or UDP broadcasts from Tempest weather stations and writes comprehensive weather data to InfluxDB, including wind, temperature, humidity, pressure, precipitation, and lightning information.
 
 ## Features
 
-- **Real-time Data Publishing**: Publishes Tempest weather data to Waggle message stream
+- **Direct InfluxDB Integration**: Writes weather data directly to InfluxDB 2.x
 - **Comprehensive Weather Data**: Wind speed/direction, temperature, humidity, pressure, precipitation, lightning
-- **Multiple Data Sources**: Supports both observation (`obs_st`) and rapid wind (`rapid_wind`) messages
-- **Automatic Parsing**: Parses Tempest UDP message formats automatically
+- **Multiple Data Sources**: Supports observation (`obs_st`), rapid wind (`rapid_wind`), and hub status messages
+- **TCP and UDP Support**: TCP (default) for reliability, UDP for backward compatibility
+- **Automatic Parsing**: Parses Tempest message formats automatically
 - **Robust Error Handling**: Continues operating even with intermittent data issues
 - **Docker Support**: Containerized for easy deployment
-- **Configurable**: Customizable UDP port, publish intervals, and debug modes
+- **Configurable**: Customizable ports, publish intervals, InfluxDB settings
 
-## Published Data Topics
+## InfluxDB Schema
 
-All data is published with:
-- **Scope**: `beehive` (data sent to central server for analysis)
-- **Sensor**: `tempest-weather-station` (identifies the data source)
-- **Missing Value**: `-9999.0` (numeric) or `"unknown"` (string) for invalid/missing data
-- **Timestamps**: Explicit UTC timestamps for all measurements
+Data is written to a single measurement with tags and fields.
 
-Example metadata structure:
-```python
-{
-  "sensor": "tempest-weather-station",
-  "units": "knots",
-  "description": "Tempest average wind speed",
-  "source": "obs_st",
-  "missing": -9999.0
-}
-```
+### Tags
 
-### Wind Data
-- `tempest.wind.speed.lull` - Wind lull speed (knots)
-- `tempest.wind.speed.avg` - Average wind speed (knots)
-- `tempest.wind.speed.gust` - Wind gust speed (knots)
-- `tempest.wind.direction` - Wind direction (degrees)
-- `tempest.wind.speed.instant` - Instant wind speed (knots, rapid updates)
-- `tempest.wind.direction.instant` - Instant wind direction (degrees, rapid updates)
+| Tag | Description |
+|-----|-------------|
+| `sensor` | Always `tempest-weather-station` |
+| `source` | Message type: `obs_st`, `rapid_wind`, `hub_status`, or `status` |
+| `device_sn` | Tempest device serial number |
+| `hub_sn` | Tempest hub serial number |
 
-### Environmental Data
-- `tempest.pressure` - Barometric pressure (hPa)
-- `tempest.temperature` - Air temperature (°C)
-- `tempest.humidity` - Relative humidity (%)
+### Fields (obs_st)
 
-### Light Data
-- `tempest.light.illuminance` - Illuminance (lux)
-- `tempest.light.uv_index` - UV index
-- `tempest.light.solar_radiation` - Solar radiation (W/m²)
+| Field | Units | Description |
+|-------|-------|-------------|
+| `wind_lull_kt` | knots | Wind lull speed |
+| `wind_avg_kt` | knots | Average wind speed |
+| `wind_gust_kt` | knots | Wind gust speed |
+| `wind_direction` | degrees | Wind direction |
+| `wind_sample_interval` | seconds | Wind sample interval |
+| `pressure_hpa` | hPa | Barometric pressure |
+| `pressure_inhg` | inHg | Barometric pressure |
+| `temperature_c` | °C | Air temperature |
+| `temperature_f` | °F | Air temperature |
+| `humidity` | % | Relative humidity |
+| `illuminance_lux` | lux | Illuminance |
+| `uv_index` | index | UV index |
+| `solar_radiation_wm2` | W/m² | Solar radiation |
+| `rain_since_report_mm` | mm | Rain since last report |
+| `rain_daily_mm` | mm | Daily rainfall |
+| `lightning_distance_km` | km | Lightning distance |
+| `lightning_count` | count | Lightning strike count |
+| `battery_v` | volts | Battery voltage |
+| `report_interval_min` | minutes | Report interval |
 
-### Precipitation Data
-- `tempest.rain.since_report` - Rain since last report (mm)
-- `tempest.rain.daily` - Daily rainfall (mm)
+### Fields (rapid_wind)
 
-### Lightning Data
-- `tempest.lightning.distance` - Lightning distance (km)
-- `tempest.lightning.count` - Lightning strike count
+| Field | Units | Description |
+|-------|-------|-------------|
+| `wind_instant_kt` | knots | Instant wind speed |
+| `wind_direction_instant` | degrees | Instant wind direction |
 
-### System Data
-- `tempest.battery` - Battery voltage (V)
-- `tempest.report_interval` - Report interval (minutes)
-- `tempest.hub.firmware` - Hub firmware version
-- `tempest.hub.uptime` - Hub uptime (seconds)
-- `tempest.hub.rssi` - Signal strength (dBm)
-- `tempest.status` - Plugin status (1=active, 0=error)
+### Fields (hub_status)
+
+| Field | Units | Description |
+|-------|-------|-------------|
+| `hub_uptime_s` | seconds | Hub uptime |
+| `hub_rssi` | dBm | Signal strength |
+| `hub_firmware` | string | Firmware version |
 
 ## Installation
 
 ### Docker (Recommended)
 
-#### Using Pre-built Multi-Arch Images
-
-The plugin is automatically built and published as multi-architecture Docker images (amd64, arm64) on GitHub Container Registry:
-
 ```bash
-# Pull and run the latest image
-docker run --network host ghcr.io/[YOUR_USERNAME]/waggle-tempest:latest
+# Clone the repository
+git clone <repository-url>
+cd tempest-influxdb
 
-# Run with custom environment variables
+# Build the container
+docker build -t tempest-influxdb .
+
+# Run with required InfluxDB configuration
 docker run --network host \
-  -e TEMPEST_DEBUG=true \
-  -e TEMPEST_PUBLISH_INTERVAL=30 \
-  ghcr.io/[YOUR_USERNAME]/waggle-tempest:latest
+  -e INFLUXDB_URL=http://localhost:8086 \
+  -e INFLUXDB_TOKEN=your-influxdb-token \
+  -e INFLUXDB_ORG=home \
+  -e INFLUXDB_BUCKET=tempest \
+  tempest-influxdb
 ```
 
-#### Building from Source
+### Docker Compose
 
 ```bash
-# Clone and build the container
-git clone <repository-url>
-cd waggle-tempest
-docker build -t tempest-weather-plugin .
+# Set your InfluxDB token
+export INFLUXDB_TOKEN=your-influxdb-token
 
-# Run with host networking (required for UDP broadcasts)
-docker run --network host tempest-weather-plugin
+# Run with default settings (TCP, connects to existing InfluxDB)
+docker-compose up -d tempest-publisher
+
+# Run full stack with bundled InfluxDB
+docker-compose --profile full-stack up -d
+
+# Run with UDP mode
+docker-compose --profile udp up -d tempest-publisher-udp
 ```
 
 ### Direct Python
@@ -106,31 +112,13 @@ docker run --network host tempest-weather-plugin
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the plugin
-python3 main.py
+# Run the publisher
+python3 main.py \
+  --influxdb-url http://localhost:8086 \
+  --influxdb-token your-token \
+  --influxdb-org home \
+  --influxdb-bucket tempest
 ```
-
-### Sesctl Deployment (SAGE Edge)
-
-For SAGE edge deployments, use the provided `plugin-tempest.yaml` configuration:
-
-```bash
-# Deploy using sesctl
-sesctl apply -f plugin-tempest.yaml
-
-# Check deployment status
-sesctl get plugins
-
-# View plugin logs
-sesctl logs plugin-tempest
-```
-
-The `plugin-tempest.yaml` configuration includes:
-- TCP protocol for reliable data reception
-- Port 50222 for Tempest connections
-- 60-second publish interval to prevent message overflow
-- Non-privileged execution for security
-- Continuous operation with proper success criteria
 
 ## Usage
 
@@ -138,252 +126,166 @@ The `plugin-tempest.yaml` configuration includes:
 
 ```bash
 # Run with default settings (TCP protocol)
-python3 main.py
+python3 main.py --influxdb-token your-token
 
 # Run with debug output
-python3 main.py --debug
+python3 main.py --influxdb-token your-token --debug
 
 # Use UDP protocol instead of TCP
-python3 main.py --protocol udp
+python3 main.py --influxdb-token your-token --protocol udp
 
 # Use custom TCP port
-python3 main.py --tcp-port 50223
+python3 main.py --influxdb-token your-token --tcp-port 50223
 
-# Use custom UDP port
-python3 main.py --protocol udp --udp-port 50223
-
-# Set custom publish interval
-python3 main.py --publish-interval 30
+# Set custom publish interval (seconds)
+python3 main.py --influxdb-token your-token --publish-interval 30
 ```
 
 ### Docker Usage
 
-#### Using GitHub Container Registry (Multi-Arch)
-
 ```bash
-# Basic deployment using pre-built multi-arch image
-docker run --network host ghcr.io/[YOUR_USERNAME]/waggle-tempest:latest
+# Basic deployment
+docker run --network host \
+  -e INFLUXDB_TOKEN=your-token \
+  tempest-influxdb
 
-# With environment variables (TCP default)
+# Full configuration
 docker run --network host \
   -e TEMPEST_PROTOCOL=tcp \
   -e TEMPEST_TCP_PORT=50222 \
-  -e TEMPEST_PUBLISH_INTERVAL=30 \
+  -e TEMPEST_PUBLISH_INTERVAL=60 \
   -e TEMPEST_DEBUG=true \
-  ghcr.io/[YOUR_USERNAME]/waggle-tempest:latest
+  -e INFLUXDB_URL=http://influxdb:8086 \
+  -e INFLUXDB_TOKEN=your-token \
+  -e INFLUXDB_ORG=home \
+  -e INFLUXDB_BUCKET=tempest \
+  -e INFLUXDB_MEASUREMENT=weather \
+  tempest-influxdb
 
 # With UDP protocol
 docker run --network host \
   -e TEMPEST_PROTOCOL=udp \
-  -e TEMPEST_UDP_PORT=50222 \
-  -e TEMPEST_DEBUG=true \
-  ghcr.io/[YOUR_USERNAME]/waggle-tempest:latest
-
-# With command-line arguments (overrides environment variables)
-docker run --network host ghcr.io/[YOUR_USERNAME]/waggle-tempest:latest \
-  --protocol udp \
-  --debug \
-  --udp-port 50223 \
-  --publish-interval 45
-```
-
-#### Local Build Usage
-
-```bash
-# Build locally first
-docker build -t tempest-weather-plugin .
-
-# Basic deployment (uses defaults)
-docker run --network host tempest-weather-plugin
-
-# With environment variables (recommended for Docker)
-docker run --network host \
-  -e TEMPEST_UDP_PORT=50222 \
-  -e TEMPEST_PUBLISH_INTERVAL=30 \
-  -e TEMPEST_DEBUG=true \
-  -e TEMPEST_NO_FIREWALL=false \
-  tempest-weather-plugin
+  -e INFLUXDB_TOKEN=your-token \
+  tempest-influxdb
 ```
 
 ## Configuration
 
-All configuration options can be set via either **environment variables** or **command-line arguments**. Command-line arguments take precedence over environment variables.
+All configuration options can be set via **environment variables** or **command-line arguments**. Command-line arguments take precedence.
 
-### Environment Variables
+### Tempest Environment Variables
 
-| Variable | Description | Type | Default |
-|----------|-------------|------|---------|
-| `TEMPEST_PROTOCOL` | Protocol to use (`tcp` or `udp`) | string | `tcp` |
-| `TEMPEST_TCP_PORT` | TCP port for length-prefixed messages | integer | `50222` |
-| `TEMPEST_UDP_PORT` | UDP port for broadcasts | integer | `50222` |
-| `TEMPEST_PUBLISH_INTERVAL` | Minimum publish interval in seconds | integer | `60` |
-| `TEMPEST_DEBUG` | Enable debug output | boolean | `false` |
-| `TEMPEST_NO_FIREWALL` | Skip firewall setup warnings | boolean | `false` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TEMPEST_PROTOCOL` | Protocol: `tcp` or `udp` | `tcp` |
+| `TEMPEST_TCP_PORT` | TCP port for messages | `50222` |
+| `TEMPEST_UDP_PORT` | UDP port for broadcasts | `50222` |
+| `TEMPEST_PUBLISH_INTERVAL` | Publish interval (seconds) | `60` |
+| `TEMPEST_DEBUG` | Enable debug output | `false` |
+| `TEMPEST_NO_FIREWALL` | Skip firewall warnings | `false` |
 
-**Protocol Details**:
-- **TCP (default)**: Receives length-prefixed JSON messages over TCP connections for improved reliability
-- **UDP**: Receives JSON broadcasts over UDP for backward compatibility
+### InfluxDB Environment Variables
 
-**Boolean values**: Use `true`, `1`, `yes`, or `on` for true; anything else is false.
-
-**Example**:
-```bash
-export TEMPEST_PROTOCOL=tcp
-export TEMPEST_TCP_PORT=50222
-export TEMPEST_PUBLISH_INTERVAL=30
-export TEMPEST_DEBUG=true
-export TEMPEST_NO_FIREWALL=false
-python3 main.py
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `INFLUXDB_URL` | InfluxDB server URL | `http://localhost:8086` |
+| `INFLUXDB_TOKEN` | Authentication token | (required) |
+| `INFLUXDB_ORG` | Organization name | `home` |
+| `INFLUXDB_BUCKET` | Bucket name | `tempest` |
+| `INFLUXDB_MEASUREMENT` | Measurement name | `weather` |
 
 ### Command Line Arguments
 
-| Argument | Description | Type | Default | Env Variable |
-|----------|-------------|------|---------|--------------|
-| `--protocol PROTOCOL` | Protocol to use (`tcp` or `udp`) | string | `tcp` | `TEMPEST_PROTOCOL` |
-| `--tcp-port PORT` | TCP port for length-prefixed messages | integer | `50222` | `TEMPEST_TCP_PORT` |
-| `--udp-port PORT` | UDP port for broadcasts | integer | `50222` | `TEMPEST_UDP_PORT` |
-| `--publish-interval SECONDS` | Minimum publish interval | integer | `60` | `TEMPEST_PUBLISH_INTERVAL` |
-| `--debug` | Enable debug output | flag | `false` | `TEMPEST_DEBUG` |
-| `--no-firewall` | Skip firewall setup warnings | flag | `false` | `TEMPEST_NO_FIREWALL` |
+```
+Network Options:
+  --protocol {tcp,udp}     Protocol to use (default: tcp)
+  --tcp-port PORT          TCP port (default: 50222)
+  --udp-port PORT          UDP port (default: 50222)
+  --publish-interval SECS  Publish interval (default: 60)
+  --debug                  Enable debug output
+  --no-firewall           Skip firewall warnings
 
-**Example**:
-```bash
-python3 main.py --debug --udp-port 50223 --publish-interval 30
+InfluxDB Options:
+  --influxdb-url URL       InfluxDB URL (default: http://localhost:8086)
+  --influxdb-token TOKEN   InfluxDB token (required)
+  --influxdb-org ORG       Organization (default: home)
+  --influxdb-bucket BUCKET Bucket name (default: tempest)
+  --influxdb-measurement   Measurement name (default: weather)
 ```
 
-### Configuration Priority
+## InfluxDB Setup
 
-1. **Command-line arguments** (highest priority)
-2. **Environment variables**
-3. **Built-in defaults** (lowest priority)
+### Creating a Bucket and Token
 
-The plugin will display which environment variables are being used at startup:
+1. Access InfluxDB UI (usually at `http://localhost:8086`)
+2. Create a new bucket named `tempest`
+3. Create an API token with write access to the bucket
+4. Use the token in your configuration
+
+### Example Flux Query
+
+```flux
+from(bucket: "tempest")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r._measurement == "weather")
+  |> filter(fn: (r) => r.source == "obs_st")
+  |> filter(fn: (r) => r._field == "temperature_c" or r._field == "humidity")
 ```
-📌 Using environment variables: UDP_PORT, PUBLISH_INTERVAL
-```
+
+### Grafana Dashboard
+
+You can visualize the data in Grafana by connecting it to your InfluxDB instance and querying the `tempest` bucket.
 
 ## Network Requirements
 
-### UDP Port Access
+### Port Access
 
-The plugin requires access to UDP port 50222 (default) to receive Tempest broadcasts. This typically requires:
+The publisher requires access to port 50222 (default) to receive Tempest data:
 
-1. **Same Network**: Tempest station and plugin must be on the same network
-2. **Firewall Configuration**: UDP port 50222 must be accessible
-3. **Broadcasting Enabled**: Tempest station must have UDP broadcasting enabled
+- **TCP Mode (default)**: Listens for incoming TCP connections with length-prefixed JSON messages
+- **UDP Mode**: Listens for UDP broadcasts from Tempest stations
 
-### Firewall Setup
+### Firewall Configuration
 
-If you encounter connectivity issues, you may need to configure firewall rules:
+If you encounter connectivity issues:
 
 ```bash
-# Allow UDP port 50222
+# Allow TCP port 50222
+sudo iptables -I INPUT -p tcp --dport 50222 -j ACCEPT
+
+# Allow UDP port 50222 (if using UDP mode)
 sudo iptables -I INPUT -p udp --dport 50222 -j ACCEPT
-
-# Or use the firewall-opener container from the main project
-docker run --privileged firewall-opener
-```
-
-## Integration with Main Project
-
-This plugin can be used alongside the main waggle-davis project:
-
-### Sidecar Deployment
-
-```bash
-# Start firewall opener
-docker run --privileged --name firewall-opener -d firewall-opener
-
-# Start Tempest plugin
-docker run --network container:firewall-opener --name tempest-plugin -d tempest-weather-plugin
-
-# Start Davis plugin (with --no-firewall since firewall is handled separately)
-docker run --device=/dev/ttyACM2 --name davis-plugin -d waggle-davis --no-firewall
-```
-
-### Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  firewall-opener:
-    build: ../firewall-opener
-    privileged: true
-    restart: unless-stopped
-    
-  tempest-plugin:
-    build: .
-    network_mode: host
-    depends_on:
-      - firewall-opener
-    restart: unless-stopped
-    
-  davis-plugin:
-    build: ..
-    devices:
-      - /dev/ttyACM2:/dev/ttyACM2
-    command: ["--no-firewall"]
-    restart: unless-stopped
 ```
 
 ## Troubleshooting
 
 ### No Data Received
 
-1. **Check Network**: Ensure Tempest station and plugin are on same network
-2. **Verify Broadcasting**: Confirm Tempest station has UDP broadcasting enabled
-3. **Firewall Issues**: Check if UDP port 50222 is accessible
-4. **Port Conflicts**: Try different UDP port with `--udp-port`
+1. **Check Network**: Ensure Tempest station and publisher are on same network
+2. **Verify Protocol**: Make sure you're using the correct protocol (TCP/UDP)
+3. **Firewall Issues**: Check if the port is accessible
+4. **Port Conflicts**: Try a different port
+
+### InfluxDB Connection Issues
+
+1. **Check URL**: Verify the InfluxDB URL is correct
+2. **Check Token**: Ensure the token has write permissions
+3. **Check Bucket**: Verify the bucket exists
+4. **Check Network**: Ensure InfluxDB is reachable
 
 ### Debug Mode
 
-Enable debug output to see detailed information:
+Enable debug output for detailed information:
 
 ```bash
-python3 main.py --debug
+python3 main.py --debug --influxdb-token your-token
 ```
 
-This will show:
-- UDP listener status
+This shows:
+- Listener status
 - Received message types
-- Parsing errors
-- Publication confirmations
-
-### Testing Connection
-
-Test UDP connectivity:
-
-```bash
-# Test port accessibility
-netstat -uln | grep 50222
-
-# Test with netcat (if Tempest is broadcasting)
-nc -u -l 50222
-```
-
-## Data Flow
-
-1. **UDP Reception**: Plugin listens for UDP broadcasts on port 50222
-2. **Message Parsing**: JSON messages are parsed into structured data
-3. **Data Publishing**: Parsed data is published to Waggle message stream
-4. **Error Handling**: Invalid messages are logged but don't stop operation
-
-### Publishing Throttling
-
-The plugin implements intelligent throttling to prevent overwhelming the Waggle message stream:
-
-- **Configurable Interval**: Set via `--publish-interval` (default: 60 seconds)
-- **Per-Message Type**: Each message type (obs_st, rapid_wind, hub_status) is throttled independently
-- **Continuous Reception**: All UDP messages are received and parsed immediately
-- **Throttled Publishing**: Data is only published to Waggle if the configured interval has elapsed
-- **Latest Data**: The most recent data is always published (not averaged or aggregated)
-
-**Example**: With `--publish-interval 60`:
-- Tempest may send rapid_wind updates every 3 seconds
-- Plugin receives and parses all updates
-- Plugin publishes to Waggle only once per minute (most recent value)
-- This prevents excessive message volume while maintaining data freshness
+- Parsing information
+- Write confirmations
 
 ## Message Types
 
@@ -401,52 +303,47 @@ The plugin implements intelligent throttling to prevent overwhelming the Waggle 
 - Hub system information
 - Includes firmware, uptime, signal strength
 
+## Publishing Throttling
+
+The publisher implements throttling to prevent excessive writes:
+
+- **Configurable Interval**: Set via `--publish-interval` (default: 60 seconds)
+- **Per-Message Type**: Each message type is throttled independently
+- **Latest Data**: The most recent data is always written (not averaged)
+
 ## Development
 
 ### Building from Source
 
 ```bash
 git clone <repository>
-cd tempest-plugin
-docker build -t tempest-weather-plugin .
+cd tempest-influxdb
+docker build -t tempest-influxdb .
 ```
 
 ### Testing
 
 ```bash
 # Test with debug output
-python3 main.py --debug
+python3 main.py --debug --influxdb-token your-token
 
-# Test with custom port
-python3 main.py --udp-port 50223 --debug
+# Test with custom settings
+python3 main.py \
+  --protocol udp \
+  --udp-port 50223 \
+  --publish-interval 10 \
+  --debug \
+  --influxdb-token your-token
 ```
 
 ## License
 
 MIT License - see LICENSE file for details.
 
-## Development
-
-For developers working on this plugin, see [DEVELOPMENT.md](DEVELOPMENT.md) for:
-- Development workflow and best practices
-- Documentation standards and requirements
-- Git workflow and commit guidelines
-- Code quality standards
-- Testing and deployment procedures
-
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes following [DEVELOPMENT.md](DEVELOPMENT.md) guidelines
-4. Update README.md, CHANGES.md, and TODO.md as needed
-5. Test thoroughly
-6. Submit a pull request
-
-## Support
-
-For issues and questions:
-- Check the troubleshooting section
-- Review the main waggle-davis project documentation
-- Open an issue on the project repository
-
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request

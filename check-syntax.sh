@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Syntax Check Script for Tempest Weather Station Waggle Plugin
+# Syntax Check Script for Tempest Weather Station InfluxDB Publisher
 # This script performs comprehensive syntax and code quality checks
 
 set -e  # Exit on any error
 
-echo "🔍 Running syntax checks for waggle-tempest..."
+echo "Running syntax checks for tempest-influxdb..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,9 +16,9 @@ NC='\033[0m' # No Color
 # Function to print status
 print_status() {
     if [ $1 -eq 0 ]; then
-        echo -e "${GREEN}✅ $2${NC}"
+        echo -e "${GREEN}[OK] $2${NC}"
     else
-        echo -e "${RED}❌ $2${NC}"
+        echo -e "${RED}[FAIL] $2${NC}"
         return 1
     fi
 }
@@ -39,7 +39,7 @@ fi
 echo ""
 echo "2. Checking Python imports..."
 
-# Test basic imports (excluding waggle for dev environments)
+# Test basic imports (excluding influxdb-client for dev environments)
 if python3 -c "
 import sys
 try:
@@ -51,10 +51,11 @@ except ImportError as e:
     sys.exit(1)
 
 try:
-    from waggle.plugin import Plugin
-    print('Waggle import successful')
+    from influxdb_client import InfluxDBClient, Point, WritePrecision
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    print('InfluxDB client import successful')
 except ImportError as e:
-    print(f'Waggle import error: {e} (expected in dev environment)')
+    print(f'InfluxDB client import error: {e} (install with: pip install influxdb-client)')
 " 2>/dev/null; then
     print_status 0 "Python imports check passed"
 else
@@ -70,11 +71,11 @@ except ImportError as e:
     missing.append(str(e))
 
 try:
-    from waggle.plugin import Plugin
-    print('Waggle import: OK')
+    from influxdb_client import InfluxDBClient, Point, WritePrecision
+    print('InfluxDB client import: OK')
 except ImportError as e:
-    if 'waggle' in str(e):
-        print('Waggle import: Missing (expected in dev)')
+    if 'influxdb' in str(e):
+        print('InfluxDB client import: Missing (install with: pip install influxdb-client)')
     else:
         missing.append(str(e))
 
@@ -89,7 +90,7 @@ else:
             print_status 1 "Critical imports failed"
             exit 1
         fi
-        print_status 0 "Python imports check passed (waggle missing in dev environment)"
+        print_status 0 "Python imports check passed (influxdb-client missing in dev environment)"
     }
 fi
 
@@ -101,18 +102,18 @@ issues_found=0
 
 # Check for print statements (should use logging)
 if grep -n "print(" main.py 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Found print() statements - consider using logger instead${NC}"
+    echo -e "${YELLOW}[WARN] Found print() statements - consider using logger instead${NC}"
     issues_found=1
 fi
 
 # Check for TODO comments
 if grep -n "TODO\|FIXME\|XXX" main.py 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Found TODO/FIXME comments in code${NC}"
+    echo -e "${YELLOW}[WARN] Found TODO/FIXME comments in code${NC}"
 fi
 
 # Check line length (warn if >120 chars)
 if grep -n "^.\{120,\}" main.py 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  Found long lines (>120 chars)${NC}"
+    echo -e "${YELLOW}[WARN] Found long lines (>120 chars)${NC}"
 fi
 
 if [ $issues_found -eq 0 ]; then
@@ -127,11 +128,11 @@ if command -v flake8 >/dev/null 2>&1; then
     if flake8 main.py --max-line-length=120 --ignore=E501,W503 2>/dev/null; then
         print_status 0 "Flake8 linting passed"
     else
-        echo -e "${YELLOW}⚠️  Flake8 found issues (may be non-critical)${NC}"
+        echo -e "${YELLOW}[WARN] Flake8 found issues (may be non-critical)${NC}"
         flake8 main.py --max-line-length=120 --ignore=E501,W503 || true
     fi
 else
-    echo -e "${YELLOW}ℹ️  Flake8 not available - skipping advanced linting${NC}"
+    echo -e "${YELLOW}[INFO] Flake8 not available - skipping advanced linting${NC}"
 fi
 
 echo ""
@@ -141,7 +142,7 @@ echo "5. Checking file permissions..."
 if [ -x main.py ]; then
     print_status 0 "main.py has execute permissions"
 else
-    echo -e "${YELLOW}ℹ️  main.py should be executable ($(ls -l main.py | cut -d' ' -f1))${NC}"
+    echo -e "${YELLOW}[INFO] main.py should be executable ($(ls -l main.py | cut -d' ' -f1))${NC}"
 fi
 
 echo ""
@@ -158,12 +159,12 @@ for file in "${required_files[@]}"; do
 done
 
 echo ""
-echo -e "${GREEN}🎉 All syntax checks completed successfully!${NC}"
+echo -e "${GREEN}All syntax checks completed successfully!${NC}"
 echo ""
 echo "Summary:"
-echo "- Python syntax: ✅ Valid"
-echo "- Imports: ✅ Working" 
-echo "- Code quality: ✅ Basic checks passed"
-echo "- Required files: ✅ Present"
+echo "- Python syntax: OK"
+echo "- Imports: OK" 
+echo "- Code quality: Basic checks passed"
+echo "- Required files: Present"
 echo ""
 echo "Ready for development and testing!"

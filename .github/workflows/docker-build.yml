@@ -88,13 +88,17 @@ jobs:
           echo "### 🚀 Usage" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "# Run with default settings" >> $GITHUB_STEP_SUMMARY
+          echo "# Run with required InfluxDB configuration" >> $GITHUB_STEP_SUMMARY
           echo "docker run --network host \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -e INFLUXDB_TOKEN=your-token \\" >> $GITHUB_STEP_SUMMARY
           echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "# Run with custom settings" >> $GITHUB_STEP_SUMMARY
+          echo "# Run with full configuration" >> $GITHUB_STEP_SUMMARY
           echo "docker run --network host \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -e INFLUXDB_URL=http://influxdb:8086 \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -e INFLUXDB_TOKEN=your-token \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -e INFLUXDB_ORG=home \\" >> $GITHUB_STEP_SUMMARY
+          echo "  -e INFLUXDB_BUCKET=tempest \\" >> $GITHUB_STEP_SUMMARY
           echo "  -e TEMPEST_DEBUG=true \\" >> $GITHUB_STEP_SUMMARY
-          echo "  -e TEMPEST_PUBLISH_INTERVAL=30 \\" >> $GITHUB_STEP_SUMMARY
           echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

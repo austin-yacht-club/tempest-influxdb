@@ -1,116 +1,108 @@
-# Waggle-Tempest TODO
+# Tempest InfluxDB TODO
 
-## Current Status: ✅ COMPLETE
+## Current Status: Ready for Testing
 
-The Tempest Weather Station Waggle Plugin is now fully functional and ready for deployment.
+The Tempest Weather Station InfluxDB Publisher has been converted from Waggle to direct InfluxDB integration.
 
 ## Recent Changes
 
-- ✅ **2025-10-12**: Reverted to direct commit workflow for simplified development
-- ✅ **2025-10-12**: Differentiated scope for obs_st (all) vs rapid_wind (node) data
+- Replaced Waggle dependency with direct InfluxDB integration
+- Updated all documentation and configuration files
+- Removed SAGE/Waggle-specific deployment files
 
 ## Completed Tasks
 
-- ✅ Implement Tempest UDP listener for receiving weather station broadcasts
-- ✅ Parse Tempest message types (obs_st, rapid_wind, hub_status)
-- ✅ Publish comprehensive weather data to Waggle message stream
-- ✅ Implement publish interval throttling to prevent message overflow
-- ✅ Add configurable command-line arguments (--udp-port, --publish-interval, --debug, --no-firewall)
-- ✅ Add environment variable support for all command-line arguments
-- ✅ Add configuration priority system (CLI > ENV > Defaults)
-- ✅ Add startup indicators showing which env vars are active
-- ✅ Add scope="beehive" to all plugin.publish() calls
-- ✅ Add sensor="tempest-weather-station" metadata to all publications
-- ✅ Add missing value indicators (-9999.0 for numeric, "unknown" for strings)
-- ✅ Add explicit UTC timestamps to all publications
-- ✅ Align publishing methodology with waggle-davis-wind-sensor plugin
-- ✅ Create Docker container with proper networking
-- ✅ Add comprehensive README documentation with env var examples
-- ✅ Implement robust error handling and logging
-- ✅ Add firewall configuration guidance
-- ✅ Refactor to use Plugin() context manager pattern
-- ✅ Remove global plugin variable for better encapsulation
-- ✅ Move publishing logic into main() as nested function with closure
-- ✅ Create DEVELOPMENT.md with comprehensive development guidelines and best practices
-- ✅ Add automated syntax checking to development workflow with check-syntax.sh script
-- ✅ Add GitHub Actions workflow for automated multi-architecture Docker builds (amd64, arm64)
-- ✅ Add TCP protocol support with length-prefixed messages as default (with UDP fallback)
+- Removed Waggle/PyWaggle dependency
+- Added influxdb-client dependency
+- Created InfluxDBWriter class for database operations
+- Converted all publish calls to InfluxDB point writes
+- Updated Dockerfile to use python:3.11-slim base image
+- Added InfluxDB environment variables and CLI arguments
+- Updated docker-compose.yml with InfluxDB configuration
+- Added optional bundled InfluxDB service in docker-compose
+- Updated README.md with InfluxDB usage instructions
+- Updated DEVELOPMENT.md for InfluxDB workflow
+- Updated check-syntax.sh for influxdb-client imports
+- Removed sage.yaml, plugin-tempest.yaml, sage-generated.yaml
 
-## Published Waggle Topics
+## InfluxDB Schema
 
-### Wind Data
-- tempest.wind.speed.lull, avg, gust (knots)
-- tempest.wind.direction (degrees)
-- tempest.wind.speed.instant, direction.instant (rapid updates)
+### Tags
+- `sensor`: tempest-weather-station
+- `source`: obs_st, rapid_wind, hub_status, status
+- `device_sn`: Tempest device serial number
+- `hub_sn`: Tempest hub serial number
 
-### Environmental Data
-- tempest.pressure (hPa)
-- tempest.temperature (°C)
-- tempest.humidity (%)
+### Fields (obs_st)
+- wind_lull_kt, wind_avg_kt, wind_gust_kt
+- wind_direction, wind_sample_interval
+- pressure_hpa, pressure_inhg
+- temperature_c, temperature_f
+- humidity
+- illuminance_lux, uv_index, solar_radiation_wm2
+- rain_since_report_mm, rain_daily_mm
+- lightning_distance_km, lightning_count
+- battery_v, report_interval_min
 
-### Light Data
-- tempest.light.illuminance (lux)
-- tempest.light.uv_index
-- tempest.light.solar_radiation (W/m²)
+### Fields (rapid_wind)
+- wind_instant_kt, wind_direction_instant
 
-### Precipitation & Lightning
-- tempest.rain.since_report, daily (mm)
-- tempest.lightning.distance (km), count
+### Fields (hub_status)
+- hub_uptime_s, hub_rssi, hub_firmware
 
-### System Data
-- tempest.battery (V)
-- tempest.report_interval (minutes)
-- tempest.hub.firmware, uptime, rssi
-- tempest.status (1=active, 0=error)
+## Testing Checklist
+
+- [ ] Test connection to InfluxDB
+- [ ] Verify data writes with obs_st messages
+- [ ] Verify data writes with rapid_wind messages
+- [ ] Verify data writes with hub_status messages
+- [ ] Test publish interval throttling
+- [ ] Test TCP listener
+- [ ] Test UDP listener
+- [ ] Test Docker container
+- [ ] Verify Grafana visualization
 
 ## Future Enhancements (Optional)
 
 ### Potential Improvements
-- [ ] Add data aggregation/averaging option for longer intervals
-- [ ] Implement historical data buffering
+- [ ] Add data aggregation/averaging option
 - [ ] Add Prometheus metrics endpoint
 - [ ] Create unit tests for parsers
-- [ ] Add integration tests with mock Tempest broadcasts
+- [ ] Add integration tests
 - [ ] Implement configuration file support (YAML/JSON)
 - [ ] Add support for multiple Tempest stations
 - [ ] Create Grafana dashboard templates
 - [ ] Add data validation and quality checks
-- [ ] Implement automatic reconnection logic for UDP socket
+- [ ] Add InfluxDB connection retry logic
 
 ### Documentation Enhancements
 - [ ] Add architecture diagram
 - [ ] Create deployment guide for various platforms
 - [ ] Add troubleshooting flowchart
-- [ ] Document message format specifications
-- [ ] Add examples of Waggle data queries
+- [ ] Add example Flux queries
+- [ ] Create Grafana dashboard JSON
 
-### Integration Features
-- [ ] Add MQTT bridge option
-- [ ] Implement webhooks for alerts
-- [ ] Add data export functionality
-- [ ] Create REST API for current conditions
-- [ ] Add support for Tempest REST API as fallback
+## Deployment Notes
 
-## Deployment Checklist
+- Requires InfluxDB 2.x (not compatible with 1.x)
+- INFLUXDB_TOKEN environment variable is required
+- Bucket must exist before starting publisher
+- Use docker-compose --profile full-stack for bundled InfluxDB
+- Default publish interval: 60 seconds
+- TCP protocol is default, UDP available with --protocol udp
 
-Before deploying to production:
-- [ ] Test with actual Tempest weather station
-- [ ] Verify network connectivity and firewall rules
-- [ ] Configure appropriate publish interval for use case
-- [ ] Set up monitoring/alerting for plugin status
-- ✅ Create plugin-tempest.yaml sesctl deployment configuration based on plugin-davis6410.yaml
-- [ ] Document deployment-specific configurations
-- [ ] Test Docker container on target platform
-- [ ] Verify Waggle data ingestion
-- [ ] Set up log aggregation/rotation
+## Configuration
 
-## Notes
+### Required
+- INFLUXDB_TOKEN: Authentication token with write access
 
-- Default publish interval: 60 seconds (prevents message overflow)
-- Requires host networking for UDP broadcasts
-- Compatible with existing waggle-davis infrastructure
-- All standard Python libraries (except waggle package)
-- All CLI arguments can be set via environment variables (TEMPEST_*)
-- Configuration priority: CLI args > Environment variables > Defaults
-- Boolean env vars accept: true/1/yes/on (case insensitive)
-
+### Optional (with defaults)
+- INFLUXDB_URL: http://localhost:8086
+- INFLUXDB_ORG: home
+- INFLUXDB_BUCKET: tempest
+- INFLUXDB_MEASUREMENT: weather
+- TEMPEST_PROTOCOL: tcp
+- TEMPEST_TCP_PORT: 50222
+- TEMPEST_UDP_PORT: 50222
+- TEMPEST_PUBLISH_INTERVAL: 60
+- TEMPEST_DEBUG: false

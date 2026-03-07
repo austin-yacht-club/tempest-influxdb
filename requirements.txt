@@ -1,8 +1,8 @@
-# Tempest Weather Station Waggle Plugin Requirements
-# ================================================
+# Tempest Weather Station InfluxDB Publisher Requirements
+# =======================================================
 
-# PyWaggle plugin framework (replaces waggle package)
-pywaggle>=0.50.0
+# InfluxDB client for writing data directly to InfluxDB 2.x
+influxdb-client>=1.36.0
 
 # Standard library modules (no additional requirements needed)
 # - json (built-in)
@@ -12,4 +12,3 @@ pywaggle>=0.50.0
 # - datetime (built-in)
 # - logging (built-in)
 # - argparse (built-in)
-

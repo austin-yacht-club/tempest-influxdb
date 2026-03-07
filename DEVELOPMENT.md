@@ -1,6 +1,6 @@
 # Development Guide
 
-This document outlines best practices for developing and maintaining the Tempest Weather Station Waggle Plugin.
+This document outlines best practices for developing and maintaining the Tempest Weather Station InfluxDB Publisher.
 
 ## Development Workflow
 
@@ -26,12 +26,12 @@ This document outlines best practices for developing and maintaining the Tempest
 
 #### Maintain TODO.md
 - Keep a **running TODO.md** with current work in progress
-- Mark completed tasks with ✅
+- Mark completed tasks with checkmarks
 - Add new tasks as they're identified
 - Include future enhancement ideas
 - Update project status regularly
 
-### 2. Git Workflow - Direct Commit to Main
+### 2. Git Workflow
 
 #### Commit Requirements
 - **Always commit changes** after every significant modification
@@ -45,53 +45,10 @@ This document outlines best practices for developing and maintaining the Tempest
   - `docs: update documentation`
   - `refactor: improve code structure`
 
-#### Commit Message Format
-```bash
-git commit -m "Type: brief description
-
-Detailed explanation of changes:
-- What was modified
-- Why it was necessary
-- Technical details
-
-Files changed:
-- File names and line numbers
-
-Benefits/Impact:
-- What this improves
-- Any breaking changes"
-```
-
-#### Example Good Commit
-```bash
-git commit -m "feat: add environment variable support for all config options
-
-Added TEMPEST_* environment variables for every command-line argument:
-- TEMPEST_UDP_PORT (default: 50222)
-- TEMPEST_PUBLISH_INTERVAL (default: 60)
-- TEMPEST_DEBUG (boolean)
-- TEMPEST_NO_FIREWALL (boolean)
-
-Files changed:
-- main.py: parse_args() function enhanced with env var support
-- README.md: comprehensive configuration tables added  
-- CHANGES.md: detailed changelog entry
-- TODO.md: updated task status
-
-Testing:
-- Syntax checks passing
-- Manual testing with various env var combinations
-- Verified CLI args override env vars as expected
-
-Benefits:
-- Better Docker/Kubernetes integration
-- Easier CI/CD configuration"
-```
-
 ### 3. Code Quality Standards
 
 #### Python Best Practices
-- Use context managers (`with Plugin() as plugin:`)
+- Use context managers where appropriate
 - Avoid global mutable state
 - Use type hints where appropriate
 - Follow PEP 8 style guidelines
@@ -100,14 +57,14 @@ Benefits:
 #### Error Handling
 - Always handle exceptions gracefully
 - Log errors with appropriate levels (DEBUG, INFO, WARNING, ERROR)
-- Publish error status to Waggle when applicable
+- Write error status to InfluxDB when applicable
 - Continue operation when possible (don't crash on single message errors)
 
 #### Testing Approach
 - Test error conditions (network failures, malformed data)
 - Verify environment variable parsing
 - Test throttling behavior
-- Validate metadata structure
+- Validate InfluxDB write operations
 
 ### 4. File Organization
 
@@ -119,6 +76,7 @@ Benefits:
 - `DEVELOPMENT.md` - This file
 - `requirements.txt` - Dependencies
 - `Dockerfile` - Container configuration
+- `docker-compose.yml` - Docker Compose configuration
 
 #### Update Priority
 When making changes, update files in this order:
@@ -173,13 +131,6 @@ This script performs:
 - File permission verification
 - Required file presence checks
 
-**Check requirements**:
-- No syntax errors (py_compile must succeed)
-- Standard library imports work correctly
-- Waggle imports are optional in development environments
-- Basic code quality issues are flagged (warnings only)
-- Required files (main.py, README.md, requirements.txt) are present
-
 ### 6. Documentation Standards
 
 #### README.md Structure
@@ -208,58 +159,19 @@ Tables of all options (CLI args + ENV vars)
 Common issues and solutions
 ```
 
-#### CHANGES.md Structure
-```markdown
-# Change Log
+### 7. InfluxDB Integration Standards
 
-## YYYY-MM-DD - Feature Title
-
-### Type: Description ✅
-
-**What was changed**:
-- Bullet points of changes
-
-**Code Changes**:
-- Specific file:line references
-
-**Benefits**:
-- Why this was needed
-
-**Example Usage**:
-```code
-examples if relevant
-```
-```
-
-#### TODO.md Structure
-```markdown
-# Project TODO
-
-## Current Status: [STATUS]
-
-## Completed Tasks
-- ✅ Completed items
-
-## In Progress
-- 🔄 Current work
-
-## Future Enhancements
-- [ ] Future ideas
-```
-
-### 7. Waggle Integration Standards
-
-#### Plugin Publishing
-- Always use `scope="beehive"` for environmental data
-- Include complete metadata with sensor name, units, descriptions
-- Use standardized missing values (-9999.0 for numeric, "unknown" for strings)
-- Add explicit UTC timestamps
+#### Data Writing
+- Use appropriate tags for filtering (sensor, source, device_sn, hub_sn)
+- Use fields for numeric measurements
+- Include timestamps with all data points
+- Filter out None values before writing
 
 #### Error Handling
-- Publish plugin status for monitoring
-- Handle UDP listener failures gracefully
+- Write status points for monitoring
+- Handle connection failures gracefully
 - Log all errors with context
-- Continue operation when possible
+- Reconnect when possible
 
 ### 8. Environment and Deployment
 
@@ -291,7 +203,7 @@ examples if relevant
 ### 10. Troubleshooting Development Issues
 
 #### Common Problems
-- Plugin initialization errors: Check Plugin() constructor requirements
+- InfluxDB connection errors: Check URL, token, and network
 - Port binding issues: Verify firewall and network configuration
 - Missing dependencies: Update requirements.txt and test installation
 - Environment variable issues: Test parsing and precedence
@@ -299,7 +211,7 @@ examples if relevant
 #### Debug Mode
 Always test with `--debug` flag enabled:
 ```bash
-python3 main.py --debug
+python3 main.py --debug --influxdb-token your-token
 ```
 
 This shows detailed logging for development and troubleshooting.
@@ -309,12 +221,12 @@ This shows detailed logging for development and troubleshooting.
 ## Quick Reference
 
 ### Before Every Commit:
-1. Run syntax checks ✅
-2. Update README.md ✅
-3. Update CHANGES.md ✅  
-4. Update TODO.md ✅
-5. Test changes ✅
-6. Git commit with detailed message ✅
+1. Run syntax checks
+2. Update README.md
+3. Update CHANGES.md  
+4. Update TODO.md
+5. Test changes
+6. Git commit with detailed message
 
 ### File Update Order:
 1. Code (main.py)

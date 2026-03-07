@@ -1,14 +1,21 @@
 version: '3.8'
 
 services:
-  tempest-plugin:
+  # Main Tempest InfluxDB publisher service
+  tempest-publisher:
     build: .
-    container_name: tempest-weather-plugin
+    container_name: tempest-influxdb-publisher
     network_mode: host
     environment:
-      - TEMPEST_UDP_PORT=50222
+      - TEMPEST_PROTOCOL=tcp
+      - TEMPEST_TCP_PORT=50222
       - TEMPEST_PUBLISH_INTERVAL=60
       - TEMPEST_DEBUG=false
+      - INFLUXDB_URL=http://localhost:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=home
+      - INFLUXDB_BUCKET=tempest
+      - INFLUXDB_MEASUREMENT=weather
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python3", "/app/main.py", "--help"]
@@ -17,57 +24,85 @@ services:
       retries: 3
       start_period: 10s
 
-  # Alternative service with custom port
-  tempest-plugin-custom:
+  # Service with UDP mode
+  tempest-publisher-udp:
     build: .
-    container_name: tempest-weather-plugin-custom
+    container_name: tempest-influxdb-publisher-udp
     network_mode: host
     environment:
-      - TEMPEST_UDP_PORT=50223
-      - TEMPEST_PUBLISH_INTERVAL=30
-      - TEMPEST_DEBUG=true
+      - TEMPEST_PROTOCOL=udp
+      - TEMPEST_UDP_PORT=50222
+      - TEMPEST_PUBLISH_INTERVAL=60
+      - TEMPEST_DEBUG=false
+      - INFLUXDB_URL=http://localhost:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=home
+      - INFLUXDB_BUCKET=tempest
+      - INFLUXDB_MEASUREMENT=weather
     restart: unless-stopped
     profiles:
-      - custom
+      - udp
 
-  # Service for testing
-  tempest-plugin-test:
+  # Service for testing with debug enabled
+  tempest-publisher-test:
     build: .
-    container_name: tempest-weather-plugin-test
+    container_name: tempest-influxdb-publisher-test
     network_mode: host
     environment:
-      - TEMPEST_UDP_PORT=50222
+      - TEMPEST_PROTOCOL=tcp
+      - TEMPEST_TCP_PORT=50222
       - TEMPEST_PUBLISH_INTERVAL=10
       - TEMPEST_DEBUG=true
+      - INFLUXDB_URL=http://localhost:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=home
+      - INFLUXDB_BUCKET=tempest
+      - INFLUXDB_MEASUREMENT=weather
     restart: "no"
     profiles:
       - test
 
-  # Integration with firewall opener from main project
-  firewall-opener:
-    build: ../firewall-opener
-    container_name: tempest-firewall-opener
-    privileged: true
+  # Full stack with InfluxDB included
+  influxdb:
+    image: influxdb:2.7
+    container_name: tempest-influxdb
+    ports:
+      - "8086:8086"
     environment:
-      - FIREWALL_PORT=50222
-      - FIREWALL_ACTION=setup
-      - FIREWALL_WAIT=0
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_PASSWORD:-tempest123}
+      - DOCKER_INFLUXDB_INIT_ORG=home
+      - DOCKER_INFLUXDB_INIT_BUCKET=tempest
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_TOKEN}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+      - influxdb-config:/etc/influxdb2
     restart: unless-stopped
     profiles:
-      - with-firewall
+      - full-stack
 
-  # Combined deployment with firewall management
-  tempest-with-firewall:
+  # Tempest publisher that connects to the bundled InfluxDB
+  tempest-publisher-full:
     build: .
-    container_name: tempest-weather-with-firewall
+    container_name: tempest-influxdb-publisher-full
     network_mode: host
     environment:
-      - TEMPEST_UDP_PORT=50222
+      - TEMPEST_PROTOCOL=tcp
+      - TEMPEST_TCP_PORT=50222
       - TEMPEST_PUBLISH_INTERVAL=60
       - TEMPEST_DEBUG=false
-    restart: unless-stopped
+      - INFLUXDB_URL=http://localhost:8086
+      - INFLUXDB_TOKEN=${INFLUXDB_TOKEN}
+      - INFLUXDB_ORG=home
+      - INFLUXDB_BUCKET=tempest
+      - INFLUXDB_MEASUREMENT=weather
     depends_on:
-      - firewall-opener
+      - influxdb
+    restart: unless-stopped
     profiles:
-      - with-firewall
+      - full-stack
 
+volumes:
+  influxdb-data:
+  influxdb-config:
