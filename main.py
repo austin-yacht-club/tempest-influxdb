@@ -20,8 +20,13 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from influxdb_client import InfluxDBClient, Point, WritePrecision
-from influxdb_client.client.write_api import SYNCHRONOUS
+# InfluxDB client is optional (not needed for dry-run mode)
+try:
+    from influxdb_client import InfluxDBClient, Point, WritePrecision
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    INFLUXDB_AVAILABLE = True
+except ImportError:
+    INFLUXDB_AVAILABLE = False
 
 
 # Tempest network configuration
@@ -170,6 +175,40 @@ TEMPEST_PARSERS = {
     "rapid_wind": parse_rapid_wind,
     "hub_status": parse_hub_status,
 }
+
+
+# ---------------- Dry Run Writer ----------------
+class DryRunWriter:
+    """Mock writer that logs data without writing to InfluxDB"""
+    
+    def __init__(self, measurement, logger):
+        self.measurement = measurement
+        self.logger = logger
+        self.logger.info("DRY RUN MODE - No data will be written to InfluxDB")
+    
+    def close(self):
+        pass
+    
+    def write_obs_st(self, obs, timestamp):
+        self.logger.info(f"[DRY RUN] Would write obs_st: "
+                        f"Wind {obs['wind']['avg_kt']:.1f} kt @ {obs['wind']['direction_deg']:.0f} deg, "
+                        f"Temp {obs['temperature']['c']:.1f} C, "
+                        f"Humidity {obs['humidity_percent']:.0f}%, "
+                        f"Pressure {obs['pressure']['hpa']:.1f} hPa")
+        return True
+    
+    def write_rapid_wind(self, data, timestamp):
+        self.logger.info(f"[DRY RUN] Would write rapid_wind: "
+                        f"{data['wind']['instant_kt']:.1f} kt @ {data['wind']['direction_deg']:.0f} deg")
+        return True
+    
+    def write_hub_status(self, data, timestamp):
+        self.logger.info(f"[DRY RUN] Would write hub_status: "
+                        f"firmware={data['firmware']}, uptime={data['uptime_s']}s, rssi={data['rssi']}dBm")
+        return True
+    
+    def write_status(self, status, error=None):
+        return True
 
 
 # ---------------- InfluxDB Writer ----------------
@@ -593,6 +632,12 @@ def parse_args():
         default=default_influx_measurement,
         help=f"InfluxDB measurement name (default: {DEFAULT_INFLUX_MEASUREMENT})"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=env_bool("TEMPEST_DRY_RUN"),
+        help="Test mode: receive and parse data without writing to InfluxDB"
+    )
     
     return parser.parse_args()
 
@@ -616,12 +661,20 @@ def main():
     logger.info("Starting Tempest Weather Station InfluxDB Publisher")
     logger.info("=" * 60)
     
-    # Validate InfluxDB token
-    if not args.influxdb_token:
-        logger.error("InfluxDB token is required. Set INFLUXDB_TOKEN or use --influxdb-token")
-        return 1
+    # Validate InfluxDB requirements (not needed in dry-run mode)
+    if not args.dry_run:
+        if not INFLUXDB_AVAILABLE:
+            logger.error("influxdb-client is not installed. Install with: pip install influxdb-client")
+            logger.error("Or use --dry-run to test without InfluxDB")
+            return 1
+        if not args.influxdb_token:
+            logger.error("InfluxDB token is required. Set INFLUXDB_TOKEN or use --influxdb-token")
+            logger.error("Use --dry-run to test without InfluxDB")
+            return 1
     
     # Show configuration
+    if args.dry_run:
+        logger.info("MODE: DRY RUN (no data will be written)")
     logger.info(f"Protocol: {args.protocol.upper()}")
     if args.protocol == "tcp":
         logger.info(f"TCP Port: {args.tcp_port}")
@@ -630,12 +683,13 @@ def main():
     logger.info(f"Publish Interval: {args.publish_interval} seconds")
     logger.info(f"Debug Mode: {args.debug}")
     logger.info("")
-    logger.info("InfluxDB Configuration:")
-    logger.info(f"  URL: {args.influxdb_url}")
-    logger.info(f"  Organization: {args.influxdb_org}")
-    logger.info(f"  Bucket: {args.influxdb_bucket}")
-    logger.info(f"  Measurement: {args.influxdb_measurement}")
-    logger.info("")
+    if not args.dry_run:
+        logger.info("InfluxDB Configuration:")
+        logger.info(f"  URL: {args.influxdb_url}")
+        logger.info(f"  Organization: {args.influxdb_org}")
+        logger.info(f"  Bucket: {args.influxdb_bucket}")
+        logger.info(f"  Measurement: {args.influxdb_measurement}")
+        logger.info("")
     
     # Check port accessibility
     if not args.no_firewall:
@@ -653,19 +707,25 @@ def main():
         except Exception as e:
             logger.warning(f"{args.protocol.upper()} port {port_to_check} binding failed: {e}")
     
-    # Initialize InfluxDB writer
-    try:
-        influx_writer = InfluxDBWriter(
-            url=args.influxdb_url,
-            token=args.influxdb_token,
-            org=args.influxdb_org,
-            bucket=args.influxdb_bucket,
+    # Initialize writer (InfluxDB or DryRun)
+    if args.dry_run:
+        influx_writer = DryRunWriter(
             measurement=args.influxdb_measurement,
             logger=logger
         )
-    except Exception as e:
-        logger.error(f"Failed to initialize InfluxDB writer: {e}")
-        return 1
+    else:
+        try:
+            influx_writer = InfluxDBWriter(
+                url=args.influxdb_url,
+                token=args.influxdb_token,
+                org=args.influxdb_org,
+                bucket=args.influxdb_bucket,
+                measurement=args.influxdb_measurement,
+                logger=logger
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize InfluxDB writer: {e}")
+            return 1
     
     # Define publishing function
     def publish_tempest_data(parsed_data, msg_type, force=False):
@@ -749,7 +809,10 @@ def main():
                 logger.info(f"   2. Check firewall settings for UDP port {args.udp_port}")
     
     logger.info("")
-    logger.info("Tempest InfluxDB publisher is running")
+    if args.dry_run:
+        logger.info("Tempest publisher is running in DRY RUN mode (no writes)")
+    else:
+        logger.info("Tempest InfluxDB publisher is running")
     logger.info("Press Ctrl+C to stop")
     logger.info("")
     
